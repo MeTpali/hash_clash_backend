@@ -34,3 +34,6 @@ class User(Base):
     created_at = Column(DateTime, default=lambda: datetime.now())
     # Активный ли пользователь обязательное
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Связь с текстами
+    texts = relationship("Text", back_populates="user")
