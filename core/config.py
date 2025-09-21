@@ -6,6 +6,17 @@ import sys
 class Settings(BaseSettings):
     DATABASE_URL: str
     DB_ECHO: bool
+
+    # Настройки JWT
+    SECRET_KEY: str
+    SECRET_ALGORITHM: str
+    TOKEN_EXPIRE_MINUTES: int
+
+    # Настройки почты
+    SMTP_SERVER: str
+    SMTP_PORT: int
+    SMTP_USER: str
+    SMTP_PASSWORD: str
     
     class Config:
         env_file = ".env"
@@ -42,7 +53,7 @@ def setup_logging():
         'repositories.organizers',
         'services.user_service',
         'services.organizer_service',
-        'core.auth.password'
+        'core.utils.password'
     ]
 
     for logger_name in loggers:

@@ -35,3 +35,29 @@ class TotpVerifyResponse(BaseSchema):
     user_id: int
     verified: bool
     message: str | None = None
+
+class AddEmailRequest(BaseSchema):
+    user_id: int
+    email: EmailStr
+
+class AddEmailResponse(BaseSchema):
+    user_id: int
+    email: EmailStr
+    message: str | None = None
+
+class UpdateEmailRequest(BaseSchema):
+    user_id: int
+    email: EmailStr
+
+class UpdateEmailResponse(BaseSchema):
+    user_id: int
+    email: EmailStr
+    message: str | None = None
+
+class TotpConfirmRequest(BaseSchema):
+    user_id: int
+    code: str
+
+class TotpConfirmResponse(BaseSchema):
+    user_id: int
+    message: str | None = None

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Подтверждение почты | Hash Clash</title>
+</head>
+
+<body style="margin:0; padding:0; background-color:#007AFF; font-family: Arial, sans-serif; color:#333;">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="center" style="padding:40px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="600"
+                    style="background:#ffffff; border-radius:16px; box-shadow:0 6px 16px rgba(0,0,0,0.15); overflow:hidden;">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="background:#007AFF; padding:30px;">
+                            <img src="/assets/logo.png" alt="Hash Clash" width="90"
+                                style="display:block; margin-bottom:10px;">
+                            <h1 style="margin:0; color:#fff; font-size:26px; font-weight:bold; letter-spacing:0.5px;">
+                                Hash Clash</h1>
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding:40px 30px;">
+                            <h2 style="margin-top:0; color:#222; font-size:24px; text-align:center;">Подтвердите вашу
+                                почту</h2>
+                            <p
+                                style="font-size:16px; line-height:1.6; color:#555; text-align:center; max-width:450px; margin:0 auto;">
+                                Добро пожаловать в <strong>Hash Clash</strong>!
+                                Остался один шаг — подтвердите ваш email, чтобы активировать аккаунт и начать
+                                пользоваться сервисом.
+                            </p>
+
+                            <p style="text-align:center; margin:40px 0;">
+                                <a href="{{ confirm_link }}"
+                                    style="background: linear-gradient(45deg, #FFD60A, #FF3B30); color:#fff; padding:16px 36px; text-decoration:none; font-size:18px; border-radius:12px; font-weight:bold; display:inline-block; box-shadow:0 4px 10px rgba(255,59,48,0.4);">
+                                    🔥 Подтвердить почту
+                                </a>
+                            </p>
+
+                            <p style="font-size:14px; color:#888; text-align:center;">
+                                Если кнопка не работает, скопируйте и вставьте ссылку в браузер:<br>
+                                <a href="{{ confirm_link }}" style="color:#007AFF; word-break:break-all;">{{
+                                    confirm_link }}</a>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="background:#f4f7fb; padding:20px; font-size:12px; color:#999;">
+                            © 2025 Hash Clash. Все права защищены.<br>
+                            Это автоматическое письмо, отвечать на него не нужно.
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

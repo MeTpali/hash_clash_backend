@@ -5,6 +5,7 @@ from core.config import settings
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.openapi.utils import get_openapi
 from core.config import setup_logging
+from fastapi.staticfiles import StaticFiles
 
 # Настраиваем логирование
 setup_logging()
@@ -33,6 +34,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Настройка статических файлов
+app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 # Подключаем роутеры API v1
 app.include_router(api_router, prefix="/api/v1")

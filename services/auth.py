@@ -5,10 +5,12 @@ from fastapi import HTTPException, status
 from repositories.auth import AuthRepository
 from core.schemas.auth import (
     RegisterRequest, AuthRequest, AuthResponse, RegisterResponse,
-    TotpGenerateRequest, TotpGenerateResponse, TotpVerifyRequest, TotpVerifyResponse
+    TotpGenerateRequest, TotpGenerateResponse, TotpVerifyRequest, TotpVerifyResponse,
+    TotpConfirmRequest, TotpConfirmResponse,
+    AddEmailRequest, AddEmailResponse, UpdateEmailRequest, UpdateEmailResponse
 )
 from core.models.users import User
-from core.auth.totp import generate_totp_secret, get_totp_uri
+from core.utils.totp import generate_totp_secret, get_totp_uri
 
 logger = logging.getLogger(__name__)
 
@@ -243,4 +245,122 @@ class AuthService:
             message=message
         )
         
+        return response
+
+    async def confirm_totp(self, request: TotpConfirmRequest) -> TotpConfirmResponse:
+        """
+        Подтверждение TOTP для пользователя с проверкой кода.
+        
+        Args:
+            request: Запрос с ID пользователя и TOTP кодом
+            
+        Returns:
+            TotpConfirmResponse: Результат подтверждения TOTP
+            
+        Raises:
+            HTTPException: Если пользователь не найден, TOTP не настроен или код неверный
+        """
+        logger.info(f"Confirming TOTP for user id: {request.user_id}")
+        
+        # Проверяем, существует ли пользователь
+        user = await self.get_user_by_id(request.user_id)
+        
+        if not user.totp_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="TOTP не настроен для данного пользователя"
+            )
+        
+        # Проверяем TOTP код перед подтверждением
+        is_valid = await self.repository.verify_totp(request.user_id, request.code)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Неверный TOTP код"
+            )
+        
+        # Подтверждаем TOTP только после успешной проверки кода
+        success = await self.repository.confirm_totp(request.user_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Ошибка при подтверждении TOTP"
+            )
+        
+        response = TotpConfirmResponse(
+            user_id=request.user_id,
+            message="TOTP успешно подтвержден и активирован"
+        )
+        
+        logger.info(f"Successfully confirmed TOTP for user id: {request.user_id}")
+        return response
+
+    async def add_email(self, request: AddEmailRequest) -> AddEmailResponse:
+        """
+        Добавление почты пользователю.
+        
+        Args:
+            request: Запрос с ID пользователя и почтой
+            
+        Returns:
+            AddEmailResponse: Результат добавления почты
+            
+        Raises:
+            HTTPException: Если пользователь не найден или почта уже занята
+        """
+        logger.info(f"Adding email {request.email} to user id: {request.user_id}")
+        
+        # Проверяем, существует ли пользователь
+        await self.get_user_by_id(request.user_id)
+        
+        # Добавляем почту через репозиторий
+        user = await self.repository.add_email(request)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Почта уже занята другим пользователем"
+            )
+        
+        response = AddEmailResponse(
+            user_id=user.id,
+            email=user.email,
+            message=f"Почта {request.email} успешно добавлена. Требуется подтверждение."
+        )
+        
+        logger.info(f"Successfully added email {request.email} to user id: {request.user_id}")
+        return response
+
+    async def update_email(self, request: UpdateEmailRequest) -> UpdateEmailResponse:
+        """
+        Изменение почты пользователя.
+        
+        Args:
+            request: Запрос с ID пользователя и новой почтой
+            
+        Returns:
+            UpdateEmailResponse: Результат изменения почты
+            
+        Raises:
+            HTTPException: Если пользователь не найден или почта уже занята
+        """
+        logger.info(f"Updating email to {request.email} for user id: {request.user_id}")
+        
+        # Проверяем, существует ли пользователь
+        await self.get_user_by_id(request.user_id)
+        
+        # Обновляем почту через репозиторий
+        user = await self.repository.update_email(request)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Почта уже занята другим пользователем"
+            )
+        
+        response = UpdateEmailResponse(
+            user_id=user.id,
+            email=user.email,
+            message=f"Почта успешно изменена на {request.email}. Требуется подтверждение."
+        )
+        
+        logger.info(f"Successfully updated email to {request.email} for user id: {request.user_id}")
         return response

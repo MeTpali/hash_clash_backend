@@ -4,9 +4,9 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models.users import User
-from core.schemas.auth import RegisterRequest, AuthRequest, AuthResponse, RegisterResponse
-from core.auth.password import get_password_hash, verify_password
-from core.auth.totp import verify_totp
+from core.schemas.auth import RegisterRequest, AuthRequest, AuthResponse, RegisterResponse, AddEmailRequest, UpdateEmailRequest
+from core.utils.password import get_password_hash, verify_password
+from core.utils.totp import verify_totp
 
 logger = logging.getLogger(__name__)
 
@@ -187,10 +187,39 @@ class AuthRepository:
             return False
             
         user.totp_key = totp_key
-        user.is_totp_confirmed = True
+        user.is_totp_confirmed = False  # TOTP нужно подтвердить отдельно
         await self.session.commit()
         
         logger.info(f"Successfully enabled TOTP for user id: {user_id}")
+        return True
+
+    async def confirm_totp(self, user_id: int) -> bool:
+        """
+        Confirm TOTP for user after successful verification.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        logger.info(f"Confirming TOTP for user id: {user_id}")
+        query = select(User).where(User.id == user_id, User.is_active == True)
+        result = await self.session.execute(query)
+        user = result.scalar_one_or_none()
+        
+        if user is None:
+            logger.warning(f"User with id {user_id} not found for TOTP confirmation")
+            return False
+            
+        if not user.totp_key:
+            logger.warning(f"TOTP not enabled for user id {user_id}")
+            return False
+            
+        user.is_totp_confirmed = True
+        await self.session.commit()
+        
+        logger.info(f"Successfully confirmed TOTP for user id: {user_id}")
         return True
 
     async def disable_totp(self, user_id: int) -> bool:
@@ -248,3 +277,83 @@ class AuthRepository:
             logger.warning(f"TOTP verification failed for user id: {user_id}")
             
         return is_valid
+
+    async def add_email(self, request: AddEmailRequest) -> Optional[User]:
+        """
+        Add email to user.
+        
+        Args:
+            request: Request with user_id and email
+            
+        Returns:
+            Optional[User]: Updated user model if successful, None if user not found or email already exists
+        """
+        logger.info(f"Adding email {request.email} to user id: {request.user_id}")
+        
+        # Check if user exists
+        user = await self.get_user_by_id(request.user_id)
+        if user is None:
+            logger.warning(f"User with id {request.user_id} not found for email addition")
+            return None
+            
+        # Check if email is already taken by another user
+        existing_user_query = select(User).where(
+            User.email == request.email,
+            User.id != request.user_id,
+            User.is_active == True
+        )
+        result = await self.session.execute(existing_user_query)
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            logger.warning(f"Email {request.email} is already taken by another user")
+            return None
+            
+        # Update user email
+        user.email = request.email
+        user.is_email_confirmed = False  # Email needs to be confirmed
+        await self.session.commit()
+        await self.session.refresh(user)
+        
+        logger.info(f"Successfully added email {request.email} to user id: {request.user_id}")
+        return user
+
+    async def update_email(self, request: UpdateEmailRequest) -> Optional[User]:
+        """
+        Update user email.
+        
+        Args:
+            request: Request with user_id and new email
+            
+        Returns:
+            Optional[User]: Updated user model if successful, None if user not found or email already exists
+        """
+        logger.info(f"Updating email to {request.email} for user id: {request.user_id}")
+        
+        # Check if user exists
+        user = await self.get_user_by_id(request.user_id)
+        if user is None:
+            logger.warning(f"User with id {request.user_id} not found for email update")
+            return None
+            
+        # Check if email is already taken by another user
+        existing_user_query = select(User).where(
+            User.email == request.email,
+            User.id != request.user_id,
+            User.is_active == True
+        )
+        result = await self.session.execute(existing_user_query)
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            logger.warning(f"Email {request.email} is already taken by another user")
+            return None
+            
+        # Update user email and reset confirmation status
+        user.email = request.email
+        user.is_email_confirmed = False  # Email needs to be confirmed again
+        await self.session.commit()
+        await self.session.refresh(user)
+        
+        logger.info(f"Successfully updated email to {request.email} for user id: {request.user_id}")
+        return user

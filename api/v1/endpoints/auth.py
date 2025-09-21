@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.schemas.auth import (
     RegisterRequest, AuthRequest, AuthResponse, RegisterResponse,
-    TotpGenerateRequest, TotpGenerateResponse, TotpVerifyRequest, TotpVerifyResponse
+    TotpGenerateRequest, TotpGenerateResponse, TotpVerifyRequest, TotpVerifyResponse,
+    TotpConfirmRequest, TotpConfirmResponse,
+    AddEmailRequest, AddEmailResponse, UpdateEmailRequest, UpdateEmailResponse
 )
 from api.deps import get_auth_service
 from services.auth import AuthService
@@ -79,7 +81,7 @@ async def generate_totp(
     - Creates new TOTP secret
     - Saves secret to database
     - Returns QR code URI for authenticator app
-    - Enables TOTP for the user
+    - TOTP requires separate confirmation after verification
     """
     return await auth_service.generate_totp(request)
 
@@ -105,3 +107,76 @@ async def verify_totp(
     - Supports time window tolerance
     """
     return await auth_service.verify_totp(request)
+
+@router.post(
+    "/totp/confirm",
+    response_model=TotpConfirmResponse,
+    summary="Confirm TOTP setup",
+    description="Confirm TOTP setup with code verification",
+    responses={
+        200: {"description": "TOTP confirmed successfully"},
+        400: {"description": "TOTP not configured or invalid code"},
+        404: {"description": "User not found"},
+        500: {"description": "Error confirming TOTP"}
+    }
+)
+async def confirm_totp(
+    request: TotpConfirmRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Confirm TOTP setup for user:
+    - Requires TOTP to be generated first
+    - Validates the provided TOTP code
+    - Sets is_totp_confirmed to true only if code is valid
+    - Activates TOTP authentication for the user
+    """
+    return await auth_service.confirm_totp(request)
+
+@router.post(
+    "/email/add",
+    response_model=AddEmailResponse,
+    summary="Add email to user",
+    description="Add email address to user account",
+    responses={
+        200: {"description": "Email added successfully"},
+        400: {"description": "Email already taken or invalid request"},
+        404: {"description": "User not found"}
+    }
+)
+async def add_email(
+    request: AddEmailRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Add email to user account:
+    - Validates email format
+    - Checks if email is already taken
+    - Sets email confirmation status to false
+    - Returns confirmation message
+    """
+    return await auth_service.add_email(request)
+
+@router.put(
+    "/email/update",
+    response_model=UpdateEmailResponse,
+    summary="Update user email",
+    description="Update user email address",
+    responses={
+        200: {"description": "Email updated successfully"},
+        400: {"description": "Email already taken or invalid request"},
+        404: {"description": "User not found"}
+    }
+)
+async def update_email(
+    request: UpdateEmailRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Update user email address:
+    - Validates new email format
+    - Checks if email is already taken by another user
+    - Resets email confirmation status to false
+    - Returns confirmation message
+    """
+    return await auth_service.update_email(request)
