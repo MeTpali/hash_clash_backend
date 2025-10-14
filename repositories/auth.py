@@ -56,13 +56,13 @@ class AuthRepository:
         logger.info(f"Successfully authenticated user {auth_data.login}")
         return user
 
-    async def register_user(self, register_data: RegisterRequest, user_type: str = "user") -> Optional[User]:
+    async def register_user(self, register_data: RegisterRequest, user_type: str = "simple") -> Optional[User]:
         """
         Register a new user.
         
         Args:
             register_data: Registration request with login and password
-            user_type: Type of user to create (default: "user")
+            user_type: Type of user to create (default: "simple")
             
         Returns:
             Optional[User]: Created user model if successful, None if user already exists
@@ -357,3 +357,32 @@ class AuthRepository:
         
         logger.info(f"Successfully updated email to {request.email} for user id: {request.user_id}")
         return user
+
+    async def confirm_email(self, user_id: int) -> bool:
+        """
+        Confirm email for user.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        logger.info(f"Confirming email for user id: {user_id}")
+        query = select(User).where(User.id == user_id, User.is_active == True)
+        result = await self.session.execute(query)
+        user = result.scalar_one_or_none()
+        
+        if user is None:
+            logger.warning(f"User with id {user_id} not found for email confirmation")
+            return False
+            
+        if not user.email:
+            logger.warning(f"No email set for user id {user_id}")
+            return False
+            
+        user.is_email_confirmed = True
+        await self.session.commit()
+        
+        logger.info(f"Successfully confirmed email for user id: {user_id}")
+        return True

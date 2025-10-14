@@ -10,6 +10,7 @@ from core.models.base import Base
 # Import all models to ensure they are registered with the metadata
 from core.models.users import User
 from core.models.text import Text
+from core.models.temp_codes import TempCode
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

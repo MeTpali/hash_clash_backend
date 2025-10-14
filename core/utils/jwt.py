@@ -9,9 +9,8 @@ def create_jwt_token(user_id: int) -> str:
     """
     expire = datetime.utcnow() + timedelta(minutes=settings.TOKEN_EXPIRE_MINUTES)
     to_encode = {"sub": str(user_id), "exp": expire}
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.SECRET_ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, settings.SECRET_ALGORITHM)
     return encoded_jwt
-
 
 def decode_jwt_token(token: str) -> Optional[int]:
     """

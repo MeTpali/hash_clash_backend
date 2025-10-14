@@ -6,6 +6,7 @@ from fastapi.security.api_key import APIKeyHeader
 from fastapi.openapi.utils import get_openapi
 from core.config import setup_logging
 from fastapi.staticfiles import StaticFiles
+from core.config import settings
 
 # Настраиваем логирование
 setup_logging()
@@ -74,7 +75,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",
-        host="172.31.7.34",
-        port=8000,
+        host=settings.HOST,
+        port=settings.PORT,
         reload=True
     )

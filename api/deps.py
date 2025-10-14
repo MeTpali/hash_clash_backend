@@ -5,9 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.session import get_async_session
 from repositories.auth import AuthRepository
 from repositories.text import TextRepository
+from repositories.temp_codes import TempCodeRepository
 
 from services.auth import AuthService
 from services.text import TextService
+from services.temp_codes import TempCodeService
 
 # Repositories
 async def get_auth_repository(db: AsyncSession = Depends(get_async_session)) -> AuthRepository:
@@ -15,6 +17,8 @@ async def get_auth_repository(db: AsyncSession = Depends(get_async_session)) -> 
 
 async def get_text_repository(db: AsyncSession = Depends(get_async_session)) -> TextRepository:
     return TextRepository(db)
+async def get_temp_code_repository(db: AsyncSession = Depends(get_async_session)) -> TempCodeRepository:
+    return TempCodeRepository(db)
 
 # Services
 async def get_auth_service(
@@ -26,3 +30,9 @@ async def get_text_service(
     text_repository: TextRepository = Depends(get_text_repository)
 ) -> TextService:
     return TextService(text_repository)
+
+async def get_temp_code_service(
+    temp_code_repository: TempCodeRepository = Depends(get_temp_code_repository),
+    auth_repository: AuthRepository = Depends(get_auth_repository)
+) -> TempCodeService:
+    return TempCodeService(temp_code_repository, auth_repository)

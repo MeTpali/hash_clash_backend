@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     SMTP_USER: str
     SMTP_PASSWORD: str
     
+    # Базовый URL приложения
+    HOST: str = "192.168.0.101"
+    PORT: int = 8000
+    BASE_URL: str = f"http://{HOST}:{PORT}/api/v1"
+    STATIC_URL: str = f"http://{HOST}:{PORT}"
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

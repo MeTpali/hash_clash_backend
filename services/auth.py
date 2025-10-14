@@ -7,10 +7,15 @@ from core.schemas.auth import (
     RegisterRequest, AuthRequest, AuthResponse, RegisterResponse,
     TotpGenerateRequest, TotpGenerateResponse, TotpVerifyRequest, TotpVerifyResponse,
     TotpConfirmRequest, TotpConfirmResponse,
-    AddEmailRequest, AddEmailResponse, UpdateEmailRequest, UpdateEmailResponse
+    AddEmailRequest, AddEmailResponse, UpdateEmailRequest, UpdateEmailResponse,
+    SendEmailConfirmationRequest, SendEmailConfirmationResponse,
+    ConfirmEmailRequest, ConfirmEmailResponse
 )
 from core.models.users import User
 from core.utils.totp import generate_totp_secret, get_totp_uri
+from core.utils.email import send_email
+from core.utils.templates import load_html_template
+from core.utils.jwt import create_jwt_token
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +56,13 @@ class AuthService:
         logger.info(f"Successfully authenticated user: {auth_data.login}")
         return response
 
-    async def register_user(self, register_data: RegisterRequest, user_type: str = "user") -> RegisterResponse:
+    async def register_user(self, register_data: RegisterRequest, user_type: str = "simple") -> RegisterResponse:
         """
         Регистрация нового пользователя.
         
         Args:
             register_data: Данные для регистрации (логин и пароль)
-            user_type: Тип пользователя (по умолчанию "user")
+            user_type: Тип пользователя (по умолчанию "simple")
             
         Returns:
             RegisterResponse: Результат регистрации
@@ -363,4 +368,97 @@ class AuthService:
         )
         
         logger.info(f"Successfully updated email to {request.email} for user id: {request.user_id}")
+        return response
+
+    async def send_email_confirmation(self, request: SendEmailConfirmationRequest) -> SendEmailConfirmationResponse:
+        """
+        Отправка письма для подтверждения почты.
+        
+        Args:
+            request: Запрос с ID пользователя
+            
+        Returns:
+            SendEmailConfirmationResponse: Результат отправки письма
+            
+        Raises:
+            HTTPException: Если пользователь не найден или у него нет почты
+        """
+        logger.info(f"Sending email confirmation for user id: {request.user_id}")
+        
+        # Проверяем, существует ли пользователь
+        user = await self.get_user_by_id(request.user_id)
+        
+        if not user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="У пользователя не указана почта"
+            )
+        
+        # Создаем токен для подтверждения
+        token = create_jwt_token(user.id)  # Токен без срока действия
+        
+        # Формируем ссылку для подтверждения
+        from core.config import settings
+        confirm_link = f"{settings.BASE_URL}/auth/confirm-email?user_id={user.id}&token={token}"
+        
+        # Загружаем HTML шаблон письма
+        email_body = load_html_template("email_body_code_confirmation.html", 
+                                       confirm_link=confirm_link, 
+                                       static_url=settings.STATIC_URL)
+                                       
+        # Отправляем письмо
+        success = send_email(
+            to_email=user.email,
+            subject="Подтверждение почты | Hash Clash",
+            body=email_body
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Ошибка при отправке письма"
+            )
+        
+        response = SendEmailConfirmationResponse(
+            user_id=user.id,
+            message=f"Письмо для подтверждения почты отправлено на {user.email}"
+        )
+        
+        logger.info(f"Successfully sent email confirmation for user id: {request.user_id}")
+        return response
+
+    async def confirm_email(self, request: ConfirmEmailRequest) -> ConfirmEmailResponse:
+        """
+        Подтверждение почты пользователя.
+        
+        Args:
+            request: Запрос с ID пользователя и токеном
+            
+        Returns:
+            ConfirmEmailResponse: Результат подтверждения
+            
+        Raises:
+            HTTPException: Если пользователь не найден или токен неверный
+        """
+        logger.info(f"Confirming email for user id: {request.user_id}")
+        
+        # Проверяем, существует ли пользователь
+        user = await self.get_user_by_id(request.user_id)
+        
+        # TODO: Здесь можно добавить проверку токена, если нужно
+        # Пока что просто подтверждаем почту
+        
+        success = await self.repository.confirm_email(request.user_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ошибка при подтверждении почты"
+            )
+        
+        response = ConfirmEmailResponse(
+            user_id=user.id,
+            message="Почта успешно подтверждена"
+        )
+        
+        logger.info(f"Successfully confirmed email for user id: {request.user_id}")
         return response

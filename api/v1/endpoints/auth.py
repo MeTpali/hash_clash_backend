@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
 from core.schemas.auth import (
     RegisterRequest, AuthRequest, AuthResponse, RegisterResponse,
     TotpGenerateRequest, TotpGenerateResponse, TotpVerifyRequest, TotpVerifyResponse,
     TotpConfirmRequest, TotpConfirmResponse,
-    AddEmailRequest, AddEmailResponse, UpdateEmailRequest, UpdateEmailResponse
+    AddEmailRequest, AddEmailResponse, UpdateEmailRequest, UpdateEmailResponse,
+    SendEmailConfirmationRequest, SendEmailConfirmationResponse,
+    ConfirmEmailRequest, ConfirmEmailResponse
 )
 from api.deps import get_auth_service
 from services.auth import AuthService
+from core.utils.templates import load_html_template
+from core.config import settings
 
 router = APIRouter(
     prefix="/auth",
@@ -180,3 +185,64 @@ async def update_email(
     - Returns confirmation message
     """
     return await auth_service.update_email(request)
+
+@router.post(
+    "/send-email-confirmation",
+    response_model=SendEmailConfirmationResponse,
+    summary="Send email confirmation",
+    description="Send email confirmation to user",
+    responses={
+        200: {"description": "Email confirmation sent successfully"},
+        400: {"description": "User not found or no email set"},
+        500: {"description": "Error sending email"}
+    }
+)
+async def send_email_confirmation(
+    request: SendEmailConfirmationRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Send email confirmation to user:
+    - Validates user exists and has email
+    - Generates confirmation token
+    - Sends email with confirmation link
+    - Returns confirmation message
+    """
+    return await auth_service.send_email_confirmation(request)
+
+@router.get(
+    "/confirm-email",
+    response_class=HTMLResponse,
+    summary="Confirm email",
+    description="Confirm user email via link",
+    responses={
+        200: {"description": "Email confirmation page"},
+        400: {"description": "Invalid confirmation request"}
+    }
+)
+async def confirm_email(
+    user_id: int,
+    token: str,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Confirm user email via link:
+    - Validates user and token
+    - Confirms email in database
+    - Returns success or failure page
+    """
+    try:
+        # Создаем запрос для подтверждения
+        request = ConfirmEmailRequest(user_id=user_id, token=token)
+        
+        # Подтверждаем почту
+        await auth_service.confirm_email(request)
+        
+        # Возвращаем страницу успеха
+        success_html = load_html_template("email_confirmation_success.html", static_url=settings.STATIC_URL)
+        return HTMLResponse(content=success_html, status_code=200)
+        
+    except HTTPException as e:
+        # Возвращаем страницу ошибки
+        fail_html = load_html_template("email_confirmation_fail.html", static_url=settings.STATIC_URL)
+        return HTMLResponse(content=fail_html, status_code=400)

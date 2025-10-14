@@ -37,3 +37,5 @@ class User(Base):
 
     # Связь с текстами
     texts = relationship("Text", back_populates="user")
+    # Связь с временными кодами
+    temp_codes = relationship("TempCode", back_populates="user")

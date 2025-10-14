@@ -61,3 +61,18 @@ class TotpConfirmRequest(BaseSchema):
 class TotpConfirmResponse(BaseSchema):
     user_id: int
     message: str | None = None
+
+class SendEmailConfirmationRequest(BaseSchema):
+    user_id: int
+
+class SendEmailConfirmationResponse(BaseSchema):
+    user_id: int
+    message: str | None = None
+
+class ConfirmEmailRequest(BaseSchema):
+    user_id: int
+    token: str
+
+class ConfirmEmailResponse(BaseSchema):
+    user_id: int
+    message: str | None = None
