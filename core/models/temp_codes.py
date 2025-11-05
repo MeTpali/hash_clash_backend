@@ -13,11 +13,12 @@ from .base import Base
 
 class TempCode(Base):
     __tablename__ = "temp_codes"
+    __table_args__ = {'schema': 'hash_clash'}
 
     # id кода обязательный
     id = Column(Integer, primary_key=True, index=True)
     # id пользователя, для которого создан код обязательный
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("hash_clash.users.id"), nullable=False)
     # Сам код обязательный
     code = Column(String(6), nullable=False)
     # Тип кода (email_confirmation, login_confirmation, etc.) обязательный

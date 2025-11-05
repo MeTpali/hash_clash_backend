@@ -17,6 +17,18 @@ logger = logging.getLogger(__name__)
 
 class DatabaseHelper:
     def __init__(self, url: str, echo: bool = False):
+        # Определяем, нужен ли SSL (для локальной БД не нужен)
+        connect_args = {
+            "command_timeout": 60,  # 60 second timeout
+            "server_settings": {
+                "search_path": "hash_clash,public"  # Устанавливаем схему по умолчанию
+            }
+        }
+        
+        # Если URL содержит SSL параметры, добавляем SSL в connect_args
+        if "sslmode=require" in url or "ssl=require" in url:
+            connect_args["ssl"] = "require"
+        
         self.engine = create_async_engine(
             url=url,
             echo=echo,
@@ -26,10 +38,7 @@ class DatabaseHelper:
             pool_timeout=30,
             pool_recycle=1800,
             pool_pre_ping=True,  # Enable connection testing
-            connect_args={
-                "ssl": "require",
-                "command_timeout": 60,  # 60 second timeout
-            },
+            connect_args=connect_args,
         )
         self.session_factory = async_sessionmaker(
             bind=self.engine,
@@ -48,6 +57,8 @@ class DatabaseHelper:
     async def session_dependency(self) -> AsyncGenerator[AsyncSession, None]:
         session = self.session_factory()
         try:
+            # Устанавливаем search_path для схемы hash_clash
+            await session.execute(text("SET search_path TO hash_clash, public"))
             # Test the connection
             await session.execute(text("SELECT 1"))
             yield session

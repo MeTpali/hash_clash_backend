@@ -46,10 +46,11 @@ class AuthService:
             )
         
         # Формируем ответ с информацией о пользователе
+        email = user.email if user.is_email_confirmed else None
         response = AuthResponse(
             user_id=user.id,
             message="Аутентификация успешна",
-            email=user.email,
+            email=email,
             totp_enabled=user.is_totp_confirmed and user.totp_key is not None
         )
         

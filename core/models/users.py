@@ -13,6 +13,7 @@ from .base import Base
 # 1. Модель User
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {'schema': 'hash_clash'}
 
     # id пользователя обязательный
     id = Column(Integer, primary_key=True, index=True)

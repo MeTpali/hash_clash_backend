@@ -1,11 +1,12 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, text
 from sqlalchemy import pool
 
 from alembic import context
 
 from core.models.base import Base
+from core.config import settings
 
 # Import all models to ensure they are registered with the metadata
 from core.models.users import User
@@ -15,6 +16,17 @@ from core.models.temp_codes import TempCode
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Используем DATABASE_URL из настроек, если он не указан в alembic.ini
+# Конвертируем async URL в sync URL для alembic (alembic работает синхронно)
+database_url = config.get_main_option("sqlalchemy.url")
+if not database_url or database_url.strip() == "" or "neon.tech" in database_url:
+    # Преобразуем postgresql+asyncpg:// в postgresql:// для alembic
+    # Alembic использует синхронный драйвер, поэтому нужен postgresql:// вместо postgresql+asyncpg://
+    db_url = settings.DATABASE_URL
+    if "postgresql+asyncpg://" in db_url:
+        db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+    config.set_main_option("sqlalchemy.url", db_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -49,6 +61,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table_schema="hash_clash",
+        include_schemas=True,
     )
 
     with context.begin_transaction():
@@ -56,7 +70,14 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
+    # Устанавливаем search_path для схемы hash_clash
+    connection.execute(text("SET search_path TO hash_clash, public"))
+    context.configure(
+        connection=connection, 
+        target_metadata=target_metadata,
+        version_table_schema="hash_clash",
+        include_schemas=True,
+    )
 
     with context.begin_transaction():
         context.run_migrations()
@@ -74,6 +95,9 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Устанавливаем search_path для схемы hash_clash
+        connection.execute(text("SET search_path TO hash_clash, public"))
+        connection.commit()
         do_run_migrations(connection)
 
 

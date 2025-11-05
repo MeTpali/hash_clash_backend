@@ -14,11 +14,12 @@ from .base import Base
 # Модель Text для загружаемого текста
 class Text(Base):
     __tablename__ = "texts"
+    __table_args__ = {'schema': 'hash_clash'}
 
     # id текста обязательный
     id = Column(Integer, primary_key=True, index=True)
     # id пользователя, который загрузил текст обязательный
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("hash_clash.users.id"), nullable=False)
     # Тип шифрования (rsa/grasshopper) обязательный
     encryption_type = Column(String, nullable=False)
     # Сам текст обязательный
