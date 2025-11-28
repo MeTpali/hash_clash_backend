@@ -1,48 +1,39 @@
 import os
 import binascii
 import hmac
-from pygost.gost34112012 import GOST34112012
+from core.utils.stribog import Stribog
 import logging
-
-ITERATIONS = 1000  # можно поднять до 100_000+ для продакшена
 
 logger = logging.getLogger(__name__)
 
 def _streebog512(data: bytes) -> bytes:
-    """Вычисляет хэш Стрибог 512 бит."""
-    return GOST34112012(data=data).digest()
-
-
-def _derive(password: str, salt: bytes, iterations: int) -> bytes:
-    """Генерация итеративного хэша пароля."""
-    logger.info(f"Deriving password hash for password: {password}")
-    pwd_bytes = password.encode("utf-8")
-    digest = _streebog512(salt + pwd_bytes)
-    for _ in range(iterations - 1):
-        digest = _streebog512(digest)
-    return digest
+    """Вычисляет хэш Стрибог 512 бит согласно ГОСТ Р 34.11-2012."""
+    return Stribog(data, digest_size=512).digest()
 
 
 def get_password_hash(password: str) -> str:
-    """Возвращает строку-хэш пароля в формате streebog512$ITERATIONS$salt$hash."""
+    """Возвращает строку-хэш пароля в формате streebog512$salt$hash."""
     salt = os.urandom(16)
-    digest = _derive(password, salt, ITERATIONS)
-    return f"streebog512${ITERATIONS}${binascii.hexlify(salt).decode()}${binascii.hexlify(digest).decode()}"
+    pwd_bytes = password.encode("utf-8")
+    digest = _streebog512(salt + pwd_bytes)
+    return f"streebog512${binascii.hexlify(salt).decode()}${binascii.hexlify(digest).decode()}"
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Проверяет совпадение пароля с хранимым хэшем."""
     try:
-        alg, iter_str, salt_hex, digest_hex = hashed_password.split("$")
+        parts = hashed_password.split("$")
+        alg, salt_hex, digest_hex = parts
         if alg.lower() != "streebog512":
             return False
-        iterations = int(iter_str)
         salt = binascii.unhexlify(salt_hex)
         expected_digest = binascii.unhexlify(digest_hex)
+        pwd_bytes = plain_password.encode("utf-8")
+        computed = _streebog512(salt + pwd_bytes)
+
     except Exception:
         return False
 
-    computed = _derive(plain_password, salt, iterations)
     return hmac.compare_digest(computed, expected_digest)
 
 

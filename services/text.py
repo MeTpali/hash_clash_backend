@@ -11,6 +11,8 @@ from core.schemas.text import (
     TextListRequest, TextListResponse
 )
 from core.models.text import Text
+from core.utils.rsa import rsa_encrypt, rsa_decrypt
+from core.utils.kuznechik import grasshopper_encrypt, grasshopper_decrypt
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +56,36 @@ class TextService:
                 detail="Текст слишком длинный (максимум 10000 символов)"
             )
         
-        text = await self.repository.create_text(text_data)
+        # Шифрование текста перед сохранением
+        text_to_save = text_data.text
+        if text_data.encryption_type == "rsa":
+            try:
+                text_to_save = rsa_encrypt(text_data.text)
+                logger.info(f"Text encrypted with RSA for user_id: {text_data.user_id}")
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Ошибка при шифровании RSA: {str(e)}"
+                )
+        # Шифрование для grasshopper (Kuznechik)
+        elif text_data.encryption_type == "grasshopper":
+            try:
+                text_to_save = grasshopper_encrypt(text_data.text)
+                logger.info(f"Text encrypted with Grasshopper (Kuznechik) for user_id: {text_data.user_id}")
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Ошибка при шифровании Grasshopper: {str(e)}"
+                )
+        
+        # Создаем копию данных с зашифрованным текстом
+        text_data_copy = TextCreateRequest(
+            user_id=text_data.user_id,
+            encryption_type=text_data.encryption_type,
+            text=text_to_save
+        )
+        
+        text = await self.repository.create_text(text_data_copy)
         if not text:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -95,11 +126,35 @@ class TextService:
                 detail=f"Текст с id {text_id} не найден или не принадлежит вам"
             )
         
+        # Расшифровка текста при получении
+        decrypted_text = text.text
+        if text.encryption_type == "rsa":
+            try:
+                decrypted_text = rsa_decrypt(text.text)
+                logger.info(f"Text decrypted with RSA for text_id: {text_id}")
+            except Exception as e:
+                logger.error(f"Error decrypting RSA text id {text_id}: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Ошибка при расшифровке текста: {str(e)}"
+                )
+        # Расшифровка для grasshopper
+        elif text.encryption_type == "grasshopper":
+            try:
+                decrypted_text = grasshopper_decrypt(text.text)
+                logger.info(f"Text decrypted with Grasshopper (Kuznechik) for text_id: {text_id}")
+            except Exception as e:
+                logger.error(f"Error decrypting Grasshopper text id {text_id}: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Ошибка при расшифровке текста: {str(e)}"
+                )
+        
         response = TextGetResponse(
             id=text.id,
             user_id=text.user_id,
             encryption_type=text.encryption_type,
-            text=text.text,
+            text=decrypted_text,
             is_active=text.is_active,
             created_at=text.created_at
         )
@@ -152,6 +207,90 @@ class TextService:
                 detail="Необходимо указать хотя бы одно поле для обновления"
             )
         
+        # Получаем текущий текст для определения типа шифрования
+        current_text = await self.repository.get_text_by_id_and_user(text_id, user_id)
+        if not current_text:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Текст с id {text_id} не найден или не принадлежит вам"
+            )
+        
+        # Определяем тип шифрования для использования
+        encryption_type_to_use = update_data.encryption_type if update_data.encryption_type is not None else current_text.encryption_type
+        
+        # Шифрование текста перед обновлением, если текст указан
+        if update_data.text is not None:
+            text_to_save = update_data.text
+            if encryption_type_to_use == "rsa":
+                try:
+                    text_to_save = rsa_encrypt(update_data.text)
+                    logger.info(f"Text encrypted with RSA for update text_id: {text_id}")
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Ошибка при шифровании RSA: {str(e)}"
+                    )
+            # Шифрование для grasshopper (Kuznechik)
+            elif encryption_type_to_use == "grasshopper":
+                try:
+                    text_to_save = grasshopper_encrypt(update_data.text)
+                    logger.info(f"Text encrypted with Grasshopper (Kuznechik) for update text_id: {text_id}")
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Ошибка при шифровании Grasshopper: {str(e)}"
+                    )
+            
+            # Обновляем текст в данных обновления
+            update_data.text = text_to_save
+        
+        # Если изменяется тип шифрования, нужно перешифровать существующий текст
+        if update_data.encryption_type is not None and update_data.encryption_type != current_text.encryption_type:
+            # Получаем расшифрованный текст
+            plain_text = current_text.text
+            if current_text.encryption_type == "rsa":
+                try:
+                    plain_text = rsa_decrypt(current_text.text)
+                    logger.info(f"Text decrypted from RSA for re-encryption text_id: {text_id}")
+                except Exception as e:
+                    logger.error(f"Error decrypting RSA text id {text_id} for re-encryption: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Ошибка при расшифровке текста для перешифрования: {str(e)}"
+                    )
+            # Если был grasshopper, расшифровываем
+            elif current_text.encryption_type == "grasshopper":
+                try:
+                    plain_text = grasshopper_decrypt(current_text.text)
+                    logger.info(f"Text decrypted from Grasshopper for re-encryption text_id: {text_id}")
+                except Exception as e:
+                    logger.error(f"Error decrypting Grasshopper text id {text_id} for re-encryption: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Ошибка при расшифровке текста для перешифрования: {str(e)}"
+                    )
+            
+            # Шифруем в новый тип, если текст не был указан в update_data
+            if update_data.text is None:
+                if update_data.encryption_type == "rsa":
+                    try:
+                        update_data.text = rsa_encrypt(plain_text)
+                        logger.info(f"Text re-encrypted to RSA for text_id: {text_id}")
+                    except ValueError as e:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Ошибка при перешифровании в RSA: {str(e)}"
+                        )
+                elif update_data.encryption_type == "grasshopper":
+                    try:
+                        update_data.text = grasshopper_encrypt(plain_text)
+                        logger.info(f"Text re-encrypted to Grasshopper for text_id: {text_id}")
+                    except Exception as e:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Ошибка при перешифровании в Grasshopper: {str(e)}"
+                        )
+        
         text = await self.repository.update_text(text_id, user_id, update_data)
         if not text:
             raise HTTPException(
@@ -159,11 +298,35 @@ class TextService:
                 detail=f"Текст с id {text_id} не найден или не принадлежит вам"
             )
         
+        # Расшифровка текста при возврате
+        decrypted_text = text.text
+        if text.encryption_type == "rsa":
+            try:
+                decrypted_text = rsa_decrypt(text.text)
+                logger.info(f"Text decrypted with RSA for update response text_id: {text_id}")
+            except Exception as e:
+                logger.error(f"Error decrypting RSA text id {text_id}: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Ошибка при расшифровке текста: {str(e)}"
+                )
+        # Расшифровка для grasshopper
+        elif text.encryption_type == "grasshopper":
+            try:
+                decrypted_text = grasshopper_decrypt(text.text)
+                logger.info(f"Text decrypted with Grasshopper (Kuznechik) for update response text_id: {text_id}")
+            except Exception as e:
+                logger.error(f"Error decrypting Grasshopper text id {text_id}: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Ошибка при расшифровке текста: {str(e)}"
+                )
+        
         response = TextUpdateResponse(
             id=text.id,
             user_id=text.user_id,
             encryption_type=text.encryption_type,
-            text=text.text,
+            text=decrypted_text,
             is_active=text.is_active,
             created_at=text.created_at,
             message="Текст успешно обновлен"
@@ -230,18 +393,36 @@ class TextService:
         
         texts = await self.repository.get_user_texts(user_id, is_active, encryption_type)
         
-        # Преобразуем модели в схемы ответа
-        text_responses = [
-            TextGetResponse(
-                id=text.id,
-                user_id=text.user_id,
-                encryption_type=text.encryption_type,
-                text=text.text,
-                is_active=text.is_active,
-                created_at=text.created_at
+        # Преобразуем модели в схемы ответа с расшифровкой
+        text_responses = []
+        for text in texts:
+            # Расшифровка текста при получении
+            decrypted_text = text.text
+            if text.encryption_type == "rsa":
+                try:
+                    decrypted_text = rsa_decrypt(text.text)
+                except Exception as e:
+                    logger.error(f"Error decrypting RSA text id {text.id}: {str(e)}")
+                    # Пропускаем текст, который не удалось расшифровать
+                    continue
+            elif text.encryption_type == "grasshopper":
+                try:
+                    decrypted_text = grasshopper_decrypt(text.text)
+                except Exception as e:
+                    logger.error(f"Error decrypting Grasshopper text id {text.id}: {str(e)}")
+                    # Пропускаем текст, который не удалось расшифровать
+                    continue
+            
+            text_responses.append(
+                TextGetResponse(
+                    id=text.id,
+                    user_id=text.user_id,
+                    encryption_type=text.encryption_type,
+                    text=decrypted_text,
+                    is_active=text.is_active,
+                    created_at=text.created_at
+                )
             )
-            for text in texts
-        ]
         
         response = TextListResponse(
             texts=text_responses,
@@ -274,11 +455,35 @@ class TextService:
                 detail=f"Текст с id {text_id} не найден"
             )
         
+        # Расшифровка текста при получении
+        decrypted_text = text.text
+        if text.encryption_type == "rsa":
+            try:
+                decrypted_text = rsa_decrypt(text.text)
+                logger.info(f"Text decrypted with RSA for admin access text_id: {text_id}")
+            except Exception as e:
+                logger.error(f"Error decrypting RSA text id {text_id}: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Ошибка при расшифровке текста: {str(e)}"
+                )
+        # Расшифровка для grasshopper
+        elif text.encryption_type == "grasshopper":
+            try:
+                decrypted_text = grasshopper_decrypt(text.text)
+                logger.info(f"Text decrypted with Grasshopper (Kuznechik) for admin access text_id: {text_id}")
+            except Exception as e:
+                logger.error(f"Error decrypting Grasshopper text id {text_id}: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Ошибка при расшифровке текста: {str(e)}"
+                )
+        
         response = TextGetResponse(
             id=text.id,
             user_id=text.user_id,
             encryption_type=text.encryption_type,
-            text=text.text,
+            text=decrypted_text,
             is_active=text.is_active,
             created_at=text.created_at
         )
@@ -297,18 +502,36 @@ class TextService:
         
         texts = await self.repository.get_all_texts()
         
-        # Преобразуем модели в схемы ответа
-        text_responses = [
-            TextGetResponse(
-                id=text.id,
-                user_id=text.user_id,
-                encryption_type=text.encryption_type,
-                text=text.text,
-                is_active=text.is_active,
-                created_at=text.created_at
+        # Преобразуем модели в схемы ответа с расшифровкой
+        text_responses = []
+        for text in texts:
+            # Расшифровка текста при получении
+            decrypted_text = text.text
+            if text.encryption_type == "rsa":
+                try:
+                    decrypted_text = rsa_decrypt(text.text)
+                except Exception as e:
+                    logger.error(f"Error decrypting RSA text id {text.id}: {str(e)}")
+                    # Пропускаем текст, который не удалось расшифровать
+                    continue
+            elif text.encryption_type == "grasshopper":
+                try:
+                    decrypted_text = grasshopper_decrypt(text.text)
+                except Exception as e:
+                    logger.error(f"Error decrypting Grasshopper text id {text.id}: {str(e)}")
+                    # Пропускаем текст, который не удалось расшифровать
+                    continue
+            
+            text_responses.append(
+                TextGetResponse(
+                    id=text.id,
+                    user_id=text.user_id,
+                    encryption_type=text.encryption_type,
+                    text=decrypted_text,
+                    is_active=text.is_active,
+                    created_at=text.created_at
+                )
             )
-            for text in texts
-        ]
         
         response = TextListResponse(
             texts=text_responses,
