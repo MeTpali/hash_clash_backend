@@ -3,6 +3,7 @@
 """
 
 import math
+from .prime_generator import generate_large_prime
 from gmpy2 import mpz
 
 def generate_rsa(length: int = 1024) -> dict:

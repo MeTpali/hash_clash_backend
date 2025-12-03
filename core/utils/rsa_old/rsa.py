@@ -17,7 +17,7 @@ class RSA:
         self.e = public_key[0]
         self.n = public_key[1]
         self.d = private_key[0]
-        logger.info("[RSA] Ключи установлены")
+        logger.info(f"[RSA] Ключи установлены. Размер модуля n: {len(str(self.n))} цифр")
     
 
     def encrypt(self, message: str) -> list[int]:

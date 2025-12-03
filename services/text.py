@@ -1,5 +1,6 @@
 from typing import Optional, List
 import logging
+import time
 from fastapi import HTTPException, status
 
 from repositories.text import TextRepository
@@ -60,8 +61,11 @@ class TextService:
         text_to_save = text_data.text
         if text_data.encryption_type == "rsa":
             try:
+                logger.info(f"[TEXT SERVICE] Начало шифрования RSA текста для user_id={text_data.user_id}. Длина текста: {len(text_data.text)} символов")
+                encrypt_start = time.time()
                 text_to_save = rsa_encrypt(text_data.text)
-                logger.info(f"Text encrypted with RSA for user_id: {text_data.user_id}")
+                encrypt_time = time.time() - encrypt_start
+                logger.info(f"[TEXT SERVICE] RSA шифрование завершено для user_id={text_data.user_id} за {encrypt_time:.4f} сек. Длина зашифрованного текста: {len(text_to_save)} символов")
             except ValueError as e:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -130,8 +134,11 @@ class TextService:
         decrypted_text = text.text
         if text.encryption_type == "rsa":
             try:
+                logger.info(f"[TEXT SERVICE] Начало расшифрования RSA текста id={text_id}. Длина зашифрованного текста: {len(text.text)} символов")
+                decrypt_start = time.time()
                 decrypted_text = rsa_decrypt(text.text)
-                logger.info(f"Text decrypted with RSA for text_id: {text_id}")
+                decrypt_time = time.time() - decrypt_start
+                logger.info(f"[TEXT SERVICE] RSA расшифрование завершено для text_id={text_id} за {decrypt_time:.4f} сек. Длина расшифрованного текста: {len(decrypted_text)} символов")
             except Exception as e:
                 logger.error(f"Error decrypting RSA text id {text_id}: {str(e)}")
                 raise HTTPException(
