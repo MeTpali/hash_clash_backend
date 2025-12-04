@@ -16,6 +16,30 @@ def get_password_hash(password: str) -> str:
     salt = os.urandom(16)
     pwd_bytes = password.encode("utf-8")
     digest = _streebog512(salt + pwd_bytes)
+    
+    # Логируем результаты перед hex кодированием
+    logger.info("=" * 80)
+    logger.info("[STRIBOG] РЕЗУЛЬТАТЫ ПЕРЕД HEX КОДИРОВАНИЕМ:")
+    logger.info(f"[STRIBOG] Соль (salt) в байтах: {salt.hex()}")
+    logger.info(f"[STRIBOG] Размер соли: {len(salt)} байт (128 бит)")
+    logger.info(f"[STRIBOG] Хэш (digest) в байтах: {digest.hex()}")
+    logger.info(f"[STRIBOG] Размер хэша: {len(digest)} байт (512 бит)")
+    logger.info(f"[STRIBOG] Первые 32 байта хэша (hex): {digest[:32].hex()}")
+    logger.info("[STRIBOG] ИНФОРМАЦИЯ О ГОСТ:")
+    logger.info("[STRIBOG] ГОСТ Р 34.11-2012 (Стрибог) - функция хеширования")
+    logger.info("[STRIBOG] Размер блока: 512 бит (64 байта)")
+    logger.info("[STRIBOG] Размер хэша: 512 бит (64 байта) или 256 бит (32 байта)")
+    logger.info("[STRIBOG] Алгоритм использует:")
+    logger.info("[STRIBOG]   - Преобразование PS (перестановка и замена байтов)")
+    logger.info("[STRIBOG]   - Преобразование L (линейное преобразование)")
+    logger.info("[STRIBOG]   - Функцию сжатия g, которая использует блочный шифр E")
+    logger.info("[STRIBOG] По ГОСТу, результат хеширования представляет собой:")
+    logger.info("[STRIBOG]   - 512-битное значение (64 байта) для Stribog-512")
+    logger.info("[STRIBOG]   - 256-битное значение (32 байта) для Stribog-256")
+    logger.info("[STRIBOG] Формат вывода: hex-строка (двоичные данные в шестнадцатеричном представлении)")
+    logger.info("[STRIBOG] Каждый байт представляется двумя шестнадцатеричными символами")
+    logger.info("=" * 80)
+    
     return f"streebog512${binascii.hexlify(salt).decode()}${binascii.hexlify(digest).decode()}"
 
 
@@ -30,6 +54,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         expected_digest = binascii.unhexlify(digest_hex)
         pwd_bytes = plain_password.encode("utf-8")
         computed = _streebog512(salt + pwd_bytes)
+        
+        # Логируем результаты перед сравнением
+        logger.info("=" * 80)
+        logger.info("[STRIBOG VERIFY] РЕЗУЛЬТАТЫ ПЕРЕД СРАВНЕНИЕМ:")
+        logger.info(f"[STRIBOG VERIFY] Вычисленный хэш (hex): {computed.hex()}")
+        logger.info(f"[STRIBOG VERIFY] Ожидаемый хэш (hex): {expected_digest.hex()}")
+        logger.info(f"[STRIBOG VERIFY] Размер вычисленного хэша: {len(computed)} байт")
+        logger.info(f"[STRIBOG VERIFY] Размер ожидаемого хэша: {len(expected_digest)} байт")
+        logger.info("=" * 80)
 
     except Exception:
         return False

@@ -97,30 +97,59 @@ def kuznechik_key_schedule(k):
 
 
 def kuznechik_encrypt(msg: str, k: int | None = DEFAULT_KEY):
-    x = int(msg.encode().hex(), 16)
+    if isinstance(msg, str):
+        x = int(msg.encode('utf-8').hex(), 16)
+    elif isinstance(msg, bytes):
+        x = int(msg.hex(), 16)
+    elif isinstance(msg, int):
+        x = msg
+        
+    # x = int(msg.encode().hex(), 16)
     keys = kuznechik_key_schedule(k)
     for round in range(9):
         x = L(S(x ^ keys[round]))
     return x ^ keys[-1]
 
-def kuznechik_decrypt(x, k):
+def kuznechik_decrypt(x, k, return_type='int'):
     keys = kuznechik_key_schedule(k)
     keys.reverse()
     for round in range(9):
         x = S_inv(L_inv(x ^ keys[round]))
     dt = x ^ keys[-1]
-    return bytes.fromhex(hex(dt)[2:]).decode()
+    
+    if return_type == 'int':
+        return dt
+    elif return_type == 'bytes':
+        # Преобразуем int в bytes (16 байт = 128 бит)
+        return dt.to_bytes(16, byteorder='big')
+    elif return_type == 'str':
+        # Пытаемся декодировать как UTF-8
+        try:
+            hex_str = hex(dt)[2:]
+            # Убеждаемся, что hex строка имеет четную длину
+            if len(hex_str) % 2 != 0:
+                hex_str = '0' + hex_str
+            # Убеждаемся, что у нас ровно 32 hex символа (16 байт)
+            hex_str = hex_str.zfill(32)
+            return bytes.fromhex(hex_str).decode('utf-8').rstrip('\x00')
+        except (UnicodeDecodeError, ValueError):
+            # Если не получается декодировать как UTF-8, возвращаем hex представление
+            return hex(dt)
+    else:
+        raise ValueError(f"Unknown return_type: {return_type}")
 
 
 if __name__ == "__main__":
     msg = "1122334455667700ffeeddccbbaa9988"
     msg = int("1122334455667700ffeeddccbbaa9988", 16)
-    print(msg)
+    print(f"Исходное сообщение (int): {msg}")
+    print(f"Исходное сообщение (hex): {hex(msg)}")
     k = int("8899aabbccddeeff0011223344556677fedcba98765432100123456789abcdef", 16)
     
     CT = kuznechik_encrypt(msg, k)
-    print(hex(CT))
-    DT = kuznechik_decrypt(CT, k)
+    print(f"Зашифрованное сообщение (hex): {hex(CT)}")
+    DT = kuznechik_decrypt(CT, k, return_type='int')
 
-    print(msg == DT)
-    print(DT)
+    print(f"Расшифрованное сообщение (int): {DT}")
+    print(f"Расшифрованное сообщение (hex): {hex(DT)}")
+    print(f"Сообщения совпадают: {msg == DT}")

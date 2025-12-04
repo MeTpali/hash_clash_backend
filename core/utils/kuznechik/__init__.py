@@ -88,6 +88,27 @@ def grasshopper_encrypt(text: str) -> str:
     json_time = time.time() - json_start
     logger.info(f"[GRASSHOPPER ENCRYPT] JSON сериализация завершена за {json_time:.4f} сек. Размер JSON: {len(json_str)} символов")
     
+    # Логируем результаты перед base64 кодированием
+    logger.info("=" * 80)
+    logger.info("[GRASSHOPPER ENCRYPT] РЕЗУЛЬТАТЫ ПЕРЕД BASE64 КОДИРОВАНИЕМ:")
+    logger.info(f"[GRASSHOPPER ENCRYPT] Зашифрованные блоки (первые 3 блока): {encrypted_blocks[:3]}")
+    logger.info(f"[GRASSHOPPER ENCRYPT] Всего зашифрованных блоков: {len(encrypted_blocks)}")
+    logger.info(f"[GRASSHOPPER ENCRYPT] Каждый блок представлен как большое целое число (128 бит)")
+    logger.info(f"[GRASSHOPPER ENCRYPT] JSON строка (первые 200 символов): {json_str[:200]}...")
+    logger.info(f"[GRASSHOPPER ENCRYPT] Размер JSON строки: {len(json_str)} байт")
+    logger.info("[GRASSHOPPER ENCRYPT] ИНФОРМАЦИЯ О ГОСТ:")
+    logger.info("[GRASSHOPPER ENCRYPT] ГОСТ Р 34.12-2015 (Кузнечик) - блочный шифр с размером блока 128 бит")
+    logger.info("[GRASSHOPPER ENCRYPT] Размер ключа: 256 бит (используется два 128-битных ключа)")
+    logger.info("[GRASSHOPPER ENCRYPT] Алгоритм состоит из 9 раундов с использованием:")
+    logger.info("[GRASSHOPPER ENCRYPT]   - Нелинейного преобразования S (S-блоки)")
+    logger.info("[GRASSHOPPER ENCRYPT]   - Линейного преобразования L (умножение в поле GF(2^8))")
+    logger.info("[GRASSHOPPER ENCRYPT] По ГОСТу, зашифрованные данные представляют собой последовательность")
+    logger.info("[GRASSHOPPER ENCRYPT] 128-битных блоков, каждый из которых зашифрован независимо")
+    logger.info("[GRASSHOPPER ENCRYPT] Формат вывода: список больших целых чисел (по одному на блок) в JSON,")
+    logger.info("[GRASSHOPPER ENCRYPT] затем кодируется в base64")
+    logger.info("[GRASSHOPPER ENCRYPT] Каждое число в списке - это результат шифрования 16-байтового блока")
+    logger.info("=" * 80)
+    
     base64_start = time.time()
     result = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
     base64_time = time.time() - base64_start

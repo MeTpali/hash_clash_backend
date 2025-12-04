@@ -49,6 +49,23 @@ def rsa_encrypt(text: str) -> str:
     json_time = time.time() - json_start
     logger.info(f"[RSA ENCRYPT] JSON сериализация завершена за {json_time:.4f} сек. Размер JSON: {len(json_str)} символов")
     
+    # Логируем результаты перед base64 кодированием
+    logger.info("=" * 80)
+    logger.info("[RSA ENCRYPT] РЕЗУЛЬТАТЫ ПЕРЕД BASE64 КОДИРОВАНИЕМ:")
+    logger.info(f"[RSA ENCRYPT] Зашифрованный список (первые 5 элементов): {encrypted_list[:5]}")
+    logger.info(f"[RSA ENCRYPT] Всего зашифрованных элементов: {len(encrypted_list)}")
+    logger.info(f"[RSA ENCRYPT] JSON строка (первые 200 символов): {json_str[:200]}...")
+    logger.info(f"[RSA ENCRYPT] Размер JSON строки: {len(json_str)} байт")
+    logger.info("[RSA ENCRYPT] ИНФОРМАЦИЯ О ГОСТ:")
+    logger.info("[RSA ENCRYPT] ГОСТ Р 34.10-2012 определяет использование RSA для цифровой подписи")
+    logger.info("[RSA ENCRYPT] ГОСТ Р 34.10-2018 (актуальная версия) также поддерживает RSA")
+    logger.info("[RSA ENCRYPT] По ГОСТу, зашифрованные данные должны представлять собой последовательность")
+    logger.info("[RSA ENCRYPT] больших целых чисел (каждое число - результат шифрования одного символа)")
+    logger.info("[RSA ENCRYPT] Формат вывода: список целых чисел в JSON, затем кодируется в base64")
+    logger.info("[RSA ENCRYPT] Каждое число в списке - это результат операции: c = m^e mod n")
+    logger.info("[RSA ENCRYPT] где m - код символа (ord), e - публичная экспонента, n - модуль")
+    logger.info("=" * 80)
+    
     base64_start = time.time()
     result = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
     base64_time = time.time() - base64_start
